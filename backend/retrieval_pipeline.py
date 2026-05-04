@@ -569,43 +569,50 @@ class RetrievalPipeline:
 
     
     def rerank(self, query: str, results: list[dict], top_k: int = 10) -> list[dict]:
-        """
-        Rerank results using Cohere API (optional but improves quality).
-        
-        TODO:
-        1. If no Cohere API key or no results, return results[:top_k]
-        
-        2. Extract texts for reranking:
-           texts = [r["payload"]["text"] for r in results]
-        
-        3. Call Cohere Rerank API:
-           - URL: "https://api.cohere.ai/v1/rerank"
-           - Headers: {"Authorization": f"Bearer {self.config.cohere_api_key}"}
-           - Body: {
-               "model": "rerank-english-v3.0",
-               "query": query,
-               "documents": texts,
-               "top_n": top_k
-           }
-        
-        4. Parse response and reorder results based on Cohere's ranking:
-           - response.results contains items with index and relevance_score
-           - Reorder your results list to match Cohere's order
-           - Update each result's score with the rerank_score
-        
-        5. Return reranked results
-        
-        Note: If Cohere API fails, catch the error and fall back to returning results[:top_k]
-        
-        Args:
-            query: Original query
-            results: Results from hybrid_search
-            top_k: Number of results to return after reranking
+      """
+      Rerank results using Cohere API.
+      """
+      # 1. Safety check: If no key or no results, return top results as-is
+      if not self.config.cohere_api_key or not results:
+        return results[:top_k]
+ 
+      try:
+        # 2. Extract texts for reranking
+        texts = [r["payload"]["text"] for r in results]
             
-        Returns:
-            Reranked list of results
-        """
-        pass
+        # 3. Call Cohere Rerank API
+        headers = {
+            "Authorization": f"Bearer {self.config.cohere_api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "rerank-english-v3.0",
+            "query": query,
+            "documents": texts,
+            "top_n": top_k
+        }
+            
+        response = requests.post("https://api.cohere.ai/v1/rerank", headers=headers, json=payload)
+        response.raise_for_status()
+            
+        rerank_data = response.json()
+            
+        # 4. Parse response and reorder results
+        reranked_results = []
+        for hit in rerank_data["results"]:
+            # 'index' tells us which original result this corresponds to
+            original_result = results[hit["index"]]
+            original_result["rerank_score"] = hit["relevance_score"]
+            reranked_results.append(original_result)
+                
+        # 5. Return the new prioritized list
+        return reranked_results
+            
+      except Exception as e:
+        # 6. Fallback: If API fails, don't crash the app
+        print(f"Reranking failed: {e}. Falling back to hybrid scores.")
+        return results[:top_k]
+
     
     def retrieve(self, query: str, top_k: int = 8) -> list[RetrievalResult]:
         """
@@ -617,9 +624,9 @@ class RetrievalPipeline:
         
 
         """
-        candidates = self.hybrid.search(query)
+        candidates = self.hybrid_search(query)
         """
-
+ 
 
 
         2. Rerank if enabled:

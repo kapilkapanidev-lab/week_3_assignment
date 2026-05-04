@@ -33,7 +33,7 @@ try:
 except ImportError:
     pass
 
-from test_backend_integration import RAGGenerator, GenerationConfig, SYSTEM_PROMPT
+from rag_generate import RAGGenerator, GenerationConfig, SYSTEM_PROMPT
 
 
 # Global instances
