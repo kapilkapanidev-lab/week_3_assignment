@@ -268,53 +268,43 @@ class RAGGenerator:
             List of unique source metadata dicts
         """
         return list(seen.values())
+
+
+
+
     
     def _call_llm(self, query: str, context: str) -> str:
-        """
-        Call OpenRouter API to generate an answer.
+    """
+    Call OpenRouter API to generate an answer.
+    """
+    # 1. Build the prompt message
+    user_message = f"""Based on the following research paper excerpts, answer this question.
         
-        TODO:
-        1. Build the user message:
-           user_message = f'''Based on the following research paper excerpts, answer this question.
-
-           Question: {query}
-
-           Research Paper Excerpts:
-           {context}
-
-           Remember to cite papers using [Paper Title] format.'''
+    Question: {query}
         
-        2. Build headers:
-           {"Authorization": f"Bearer {self.openrouter_api_key}", "Content-Type": "application/json"}
+    Research Paper Excerpts:
+    {context}
         
-        3. Build payload:
-           {
-               "model": self.config.llm_model,
-               "messages": [
-                   {"role": "system", "content": SYSTEM_PROMPT},
-                   {"role": "user", "content": user_message}
-               ],
-               "temperature": self.config.temperature,
-               "max_tokens": self.config.max_tokens
-           }
+    Remember to cite papers using [Paper Title] format."""
         
-        4. Make POST request to f"{self.openrouter_base_url}/chat/completions"
+    # 2. Setup API headers and payload
+    headers = {"Authorization": f"Bearer {self.openrouter_api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": self.config.llm_model, # gpt-4o
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message}
+        ],
+        "temperature": self.config.temperature,
+        "max_tokens": self.config.max_tokens
+    }
         
-        5. Check response status, raise error if not 200
+    # 3. Call OpenRouter
+    response = requests.post(f"{self.openrouter_base_url}/chat/completions", headers=headers, json=payload)
+    response.raise_for_status() # Check for errors
         
-        6. Parse response and extract answer from the response
-           answer = response_json["choices"][0]["message"]["content"]
-        
-        7. Return the answer
-        
-        Args:
-            query: User's question
-            context: Formatted context from retrieved chunks
-            
-        Returns:
-            Generated answer string
-        """
-        pass
+    # 4. Return the answer text
+    return response.json()["choices"][0]["message"]["content"]
     
     def generate(self, query: str, top_k: Optional[int] = None, return_sources: bool = True) -> dict:
         """
