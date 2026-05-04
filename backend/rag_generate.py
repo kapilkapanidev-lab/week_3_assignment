@@ -89,20 +89,35 @@ class RAGGenerator:
         """
         Initialize the RAG generator.
         
+
         TODO:
         1. Set config (use default if not provided):
            self.config = config or GenerationConfig()
         
+        """
+        self.config = config or GenerationConfig()
+        """
+
         2. Initialize the retrieval pipeline:
            self.retrieval = retrieval_pipeline or RetrievalPipeline()
-        
+        """
+        self.retrieval = retrieval_pipeline or RetrievalPipeline()
+        """
+
         3. Get OpenRouter API key (from config or environment):
            self.openrouter_api_key = self.config.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
-        
+        """
+        self.openrouter_api_key = self.config.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+        """
+
         4. Validate API key exists:
            if not self.openrouter_api_key:
                raise ValueError("OPENROUTER_API_KEY not set")
-        
+        """
+        if not self.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY not set")
+        """
+
         5. Store the base URL:
            self.openrouter_base_url = "https://openrouter.ai/api/v1"
         
@@ -110,7 +125,7 @@ class RAGGenerator:
             config: Optional configuration object
             retrieval_pipeline: Optional pre-initialized retrieval pipeline
         """
-        pass
+        self.openrouter_base_url = "https://openrouter.ai/api/v1"
     
     def refine_query(self, query: str) -> str:
         """
@@ -155,6 +170,10 @@ class RAGGenerator:
         
         TODO:
         1. Build a list of formatted source strings
+
+        """
+        context_parts = []
+        """
         
         2. For each result (enumerate with index starting at 1):
            formatted = f'''
@@ -166,10 +185,31 @@ class RAGGenerator:
            Content:
            {result.text}
            '''
+        """
+        for i, result in enumerate(results, 1):
+            formatted = f'''
+            --- Source {i} ---
+            Title: {result.title}
+            Authors: {result.authors}
+            Section: {result.chunk_section}
+            
+            Content:
+            {result.text}
+            '''
+            context_parts.append(formatted)
+        """
         
         3. Join all formatted strings with newlines
+
+        """
+        context = "\n\n".join(context_parts)
+        """
         
         4. Return the combined context string
+
+        """
+        return context
+        """
         
         Args:
             results: List of RetrievalResult objects
@@ -177,7 +217,7 @@ class RAGGenerator:
         Returns:
             Formatted context string
         """
-        pass
+        
     
     def _build_sources_metadata(self, results: list[RetrievalResult]) -> list[dict]:
         """
@@ -322,5 +362,8 @@ if __name__ == "__main__":
     print(result['answer'])
     print("=" * 60)
     print(f"\nSources: {len(result.get('sources', []))} papers")
+    for source in result.get('sources', []):
+        print(f"  - {source['title']}")
+
     for source in result.get('sources', []):
         print(f"  - {source['title']}")
