@@ -68,6 +68,8 @@ class GenerationConfig:
     refine_query: bool = True  # Whether to refine queries before retrieval
     refinement_model: str = "openai/gpt-3.5-turbo"  # Cheaper model for refinement
     retrieval_top_k: int = 8  # Number of chunks to retrieve
+    use_reranker: bool = True  # Whether to use reranking
+    llm_provider: str = "openai"  # LLM provider name
 
 
 # =============================================================================

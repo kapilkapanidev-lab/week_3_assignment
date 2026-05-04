@@ -515,7 +515,7 @@ class RetrievalPipeline:
            combined_score = (semantic_weight * semantic_score) + (bm25_weight * bm25_score)
 
         """
-
+        combined = {}
         for r in semantic_results:
             cid = r["chunk_id"]
             combined[cid] = {
