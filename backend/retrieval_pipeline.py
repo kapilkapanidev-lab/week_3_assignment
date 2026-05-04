@@ -204,18 +204,24 @@ class BM25Index:
         
         TODO:
         1. Convert text to lowercase
+        """
+        text = text.lower()
         
+        """
+
         2. Use regex to find all words (alphanumeric sequences)
+
+        """
+
+        tokens = re.findall(r'\w+', text)
+        
+
+        """
         
         3. Return the list of tokens
-        
-        Args:
-            text: Text to tokenize
-            
-        Returns:
-            List of lowercase word tokens
+
         """
-        pass
+        return tokens
     
     def search(self, query: str, top_k: int = 50) -> list[tuple[int, float]]:
         """
