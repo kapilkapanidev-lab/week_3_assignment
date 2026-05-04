@@ -126,7 +126,7 @@ class RAGGenerator:
             retrieval_pipeline: Optional pre-initialized retrieval pipeline
         """
         self.openrouter_base_url = "https://openrouter.ai/api/v1"
-    
+
     def refine_query(self, query: str) -> str:
         """
         Use LLM to improve the search query (optional but helps retrieval).
@@ -274,37 +274,37 @@ class RAGGenerator:
 
     
     def _call_llm(self, query: str, context: str) -> str:
-    """
-    Call OpenRouter API to generate an answer.
-    """
-    # 1. Build the prompt message
-    user_message = f"""Based on the following research paper excerpts, answer this question.
-        
-    Question: {query}
-        
-    Research Paper Excerpts:
-    {context}
-        
-    Remember to cite papers using [Paper Title] format."""
-        
-    # 2. Setup API headers and payload
-    headers = {"Authorization": f"Bearer {self.openrouter_api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": self.config.llm_model, # gpt-4o
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ],
-        "temperature": self.config.temperature,
-        "max_tokens": self.config.max_tokens
-    }
-        
-    # 3. Call OpenRouter
-    response = requests.post(f"{self.openrouter_base_url}/chat/completions", headers=headers, json=payload)
-    response.raise_for_status() # Check for errors
-        
-    # 4. Return the answer text
-    return response.json()["choices"][0]["message"]["content"]
+        """
+        Call OpenRouter API to generate an answer.
+        """
+        # 1. Build the prompt message
+        user_message = f"""Based on the following research paper excerpts, answer this question.
+            
+        Question: {query}
+            
+        Research Paper Excerpts:
+        {context}
+            
+        Remember to cite papers using [Paper Title] format."""
+            
+        # 2. Setup API headers and payload
+        headers = {"Authorization": f"Bearer {self.openrouter_api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": self.config.llm_model, # gpt-4o
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            "temperature": self.config.temperature,
+            "max_tokens": self.config.max_tokens
+        }
+            
+        # 3. Call OpenRouter
+        response = requests.post(f"{self.openrouter_base_url}/chat/completions", headers=headers, json=payload)
+        response.raise_for_status() # Check for errors
+            
+        # 4. Return the answer text
+        return response.json()["choices"][0]["message"]["content"]
     
     def generate(self, query: str, top_k: Optional[int] = None, return_sources: bool = True) -> dict:
         """
@@ -313,9 +313,17 @@ class RAGGenerator:
         
         TODO:
         1. Refine the query:
-        
+        """
+
+        refined = self.refine_query(query) if self.config.refine_query else query
+        """
         2. Retrieve relevant chunks:
-           
+        
+        """
+        results = self.retrieval.retrieve(refined, top_k=top_k or self.config.retrieval_top_k)
+
+        """
+
         3. Handle empty results:
            if not results:
                return {
@@ -324,11 +332,30 @@ class RAGGenerator:
                    "answer": "I couldn't find any relevant papers to answer this question.",
                    "sources": []
                }
+        """
         
+        if not results:
+            return {
+            "query": query,
+            "refined_query": refined,
+            "answer": "I couldn't find any relevant papers in my 11,008-chunk library to answer this.",
+            "sources": []
+        }
+
+        """
         4. Format context from results:
            
+        """
+        context = self._format_context(results)
+
+        """
         5. Generate answer using LLM:
         
+        """
+
+        answer = self._call_llm(refined, context)
+
+        """
         6. Build and return response dict:
            {
                "query": query,
@@ -345,7 +372,12 @@ class RAGGenerator:
         Returns:
             Dict with query, refined_query, answer, and sources
         """
-        pass
+        return {
+            "query": query,
+            "refined_query": refined,
+            "answer": answer,
+            "sources": self._build_sources_metadata(results)
+        }
 
 
 # =============================================================================
