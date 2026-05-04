@@ -227,6 +227,10 @@ class RAGGenerator:
         TODO:
         1. Create a dict to track seen titles (for deduplication):
            seen = {}
+
+           """
+           seen = {}
+           """
         
         2. For each result:
            - If title not in seen:
@@ -240,7 +244,21 @@ class RAGGenerator:
                    "acm_url": result.acm_url,
                    "abstract_url": result.abstract_url,
                }
+
+           """
+           for result in results:
+               if result.title not in seen:
+                   seen[result.title] = {
+                       "title": result.title,
+                       "authors": result.authors,
+                       "pdf_url": result.pdf_url,
+                       "github_link": result.github_link,
+                       "video_link": result.video_link,
+                       "acm_url": result.acm_url,
+                       "abstract_url": result.abstract_url,
+                   }
         
+        """
         3. Return list(seen.values())
         
         Args:
@@ -249,7 +267,7 @@ class RAGGenerator:
         Returns:
             List of unique source metadata dicts
         """
-        pass
+        return list(seen.values())
     
     def _call_llm(self, query: str, context: str) -> str:
         """
