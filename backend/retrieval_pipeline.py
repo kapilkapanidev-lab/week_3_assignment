@@ -75,17 +75,12 @@ class OpenRouterEmbedder:
     def __init__(self, api_key: str, model: str = "baai/bge-large-en-v1.5"):
         """
         Initialize the embedder.
-        
-        TODO:
-        1. Store the api_key: self.api_key = api_key
-        2. Store the model: self.model = model
-        3. Store the base URL: self.base_url = "https://openrouter.ai/api/v1"
-        
-        Args:
-            api_key: OpenRouter API key
-            model: Embedding model to use
         """
-        pass
+
+        self.api_key = api_key
+        self.model = model
+        self.base_url = "https://openrouter.ai/api/v1"
+
     
     def embed_query(self, text: str) -> np.ndarray:
         """
@@ -95,19 +90,58 @@ class OpenRouterEmbedder:
         1. Build headers dict:
            - "Authorization": f"Bearer {self.api_key}"
            - "Content-Type": "application/json"
+
+        """
+        headers = {
+          "Authorization": f"Bearer {self.api_key}",
+          "Content-Type": "application/json"
+        }
+
+        """
         
         2. Build payload dict:
            - "model": self.model
            - "input": text
+
+        """
+        payload = {
+            "model": self.model,
+            "input": text
+        }
+
+        """
         
         3. Make POST request to f"{self.base_url}/embeddings"
+
+        """
+
+        response = requests.post(f"{self.base_url}/embeddings", headers=headers, json=payload)
+
+        """
         
         4. Check response status code, raise error if not 200
+
+        """
+
+        if response.status_code != 200:
+          raise ValueError(f"OpenRouter API error: {response.status_code} - {response.text}")
+
+        """
         
         5. Parse response JSON
+
+
+        """
+
+        """
         
         6. Extract embedding: embedding = response_data["data"][0]["embedding"]
+
+        """
+        response_data = response.json()
+        embedding = response_data["data"][0]["embedding"]
         
+        """
         7. Convert to numpy array and return:
            return np.array(embedding, dtype=np.float32)
         
@@ -117,7 +151,9 @@ class OpenRouterEmbedder:
         Returns:
             Embedding vector as numpy array
         """
-        pass
+
+
+        return np.array(embedding, dtype=np.float32)
 
 
 class BM25Index:
