@@ -169,20 +169,34 @@ class BM25Index:
         
         TODO:
         1. Store the chunks: self.chunks = chunks
+
+        """
+        self.chunks = chunks
         
+        """
         2. Create a lookup dict for quick access by chunk_id:
            self.chunk_id_to_idx = {c["chunk_id"]: i for i, c in enumerate(chunks)}
+
+           """
+        self.chunk_id_to_idx = {c["chunk_id"]: i for i, c in enumerate(chunks)}
+
+        """
         
         3. Tokenize all documents (convert each chunk's text to list of words):
            self.tokenized_docs = [self._tokenize(c["text"]) for c in chunks]
+
+        """
+        self.tokenized_docs = [self._tokenize(c["text"]) for c in chunks]
+        
+        """
         
         4. Create the BM25 index:
            self.bm25 = BM25Okapi(self.tokenized_docs)
-        
-        Args:
-            chunks: List of chunk dictionaries from chunks.json
+
         """
-        pass
+
+        self.bm25 = BM25Okapi(self.tokenized_docs)
+    
     
     def _tokenize(self, text: str) -> list[str]:
         """
