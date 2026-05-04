@@ -229,15 +229,43 @@ class BM25Index:
         
         TODO:
         1. Tokenize the query
+
+        """
+        
+        tokenized_query =  self._tokenize(query)
+
+        """
         
         2. Get BM25 scores for all documents
-        
+
+        """
+
+        bm25_scores = self.bm25.get_scores(tokenized_query)
+
+        """
+         
         3. Get indices of top-k highest scores (hint: use np.argsort)
+
+        """
+        top_k_indices = np.argsort(bm25_scores)[-top_k:][::-1]
+        
+        """
+
         
         4. Build result list with only non-zero scores (hint: use list comprehension)
            
-        5. Return results
+        """
+        results = [(idx, bm25_scores[idx]) for idx in top_k_indices if bm25_scores[idx] > 0]
         
+        """
+        
+        5. Return results
+
+        """
+
+        return results
+        
+        """
         Args:
             query: Search query string
             top_k: Maximum number of results to return
@@ -245,7 +273,6 @@ class BM25Index:
         Returns:
             List of (chunk_index, score) tuples, sorted by score descending
         """
-        pass
 
 
 class RetrievalPipeline:
@@ -267,21 +294,65 @@ class RetrievalPipeline:
                cohere_api_key=os.getenv("COHERE_API_KEY"),
                chunks_path=os.getenv("CHUNKS_PATH", "./chunks.json"),
            )
-        
+
+           """
+        if config is None:
+            config = RetrievalPipelineConfig(
+                qdrant_url=os.getenv("QDRANT_URL"),
+                qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+                openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
+                cohere_api_key=os.getenv("COHERE_API_KEY"),
+                chunks_path=os.getenv("CHUNKS_PATH", "./chunks.json"),
+            )
+
+            """
+      
         2. Validate required fields - raise ValueError if missing:
            - config.qdrant_url
            - config.qdrant_api_key
            - config.openrouter_api_key
+
+           """
+
+        if not config.qdrant_url or not config.qdrant_api_key or not config.openrouter_api_key:
+            raise ValueError("Missing required configuration for RetrievalPipeline (check your .env file)")
+
         
+        """
+
+
         3. Initialize Qdrant client:
-        
+
+        """
+        self.qdrant = QdrantClient(url=config.qdrant_url, api_key=config.qdrant_api_key)
+
+        """  
         4. Initialize the embedder:
-           
+        """
+        self.embedder = OpenRouterEmbedder(api_key=config.openrouter_api_key, model=config.embedding_model)
+
+        """  
+
         5. Load chunks from JSON file:
+
+        """
+
+        with open(config.chunks_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            self.chunks = data["chunks"]
+
+        """       
         
         6. Build BM25 index:
            self.bm25_index = BM25Index(self.chunks)
            print("BM25 index built")
+
+        """
+
+        self.bm25_index = BM25Index(self.chunks)
+        print("BM25 index built")
+
+        """
         
         7. Store the config:
            self.config = config
@@ -289,7 +360,8 @@ class RetrievalPipeline:
         Args:
             config: Optional configuration. If None, loads from environment variables.
         """
-        pass
+        self.config = config
+        
     
     def semantic_search(self, query: str, top_k: int = 30) -> list[dict]:
         """
@@ -503,3 +575,6 @@ if __name__ == "__main__":
         print(f"   Paper ID: {r.paper_id}")
         print(f"   Text preview: {r.text[:100]}...")
         print()
+
+
+
