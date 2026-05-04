@@ -385,7 +385,11 @@ class RetrievalPipeline:
            ).points
 
         """
-        results = self.qdrant.query_points(collection_name="siggraph2025_papers", query=query_embedding_vector.tolist(), limit=top_k, with_payload=True).points
+        results = self.qdrant.query_points(
+          collection_name="siggraph2025_papers", 
+          query=query_embedding_vector.tolist(), 
+          limit=top_k, with_payload=True
+          ).points
 
         """
 
@@ -424,6 +428,13 @@ class RetrievalPipeline:
         1. Call BM25 search:
            results = self.bm25_index.search(query, top_k)
         
+        """
+
+        results = self.bm25_index.search(query,top_k)
+
+
+
+        """
         2. Convert to list of dicts (same format as semantic_search):
            return [
                {
@@ -437,11 +448,17 @@ class RetrievalPipeline:
         Args:
             query: Search query
             top_k: Number of results to return
-            
-        Returns:
-            List of result dicts with chunk_id, score, and payload
+        
         """
-        pass
+
+        return [
+               {
+                   "chunk_id": self.chunks[idx]["chunk_id"],
+                   "score": score,
+                   "payload": self.chunks[idx]
+               }
+               for idx, score in results
+           ]        
     
     def hybrid_search(self, query: str, semantic_top_k: int = 30, bm25_top_k: int = 30) -> list[dict]:
         """
@@ -452,13 +469,37 @@ class RetrievalPipeline:
            semantic_results = self.semantic_search(query, semantic_top_k)
            bm25_results = self.bm25_search(query, bm25_top_k)
         
+        """
+        semantic_results = self.semantic_search(query, semantic_top_k)
+        bm25_results = self.bm25_search(query)
+
+        """
         2. Normalize semantic scores (divide by max score):
            if semantic_results:
                max_semantic = max(r["score"] for r in semantic_results)
                for r in semantic_results:
                    r["normalized_score"] = r["score"] / max_semantic if max_semantic > 0 else 0
         
+        """
+
+        if semantic_results:
+            max_semantic = max(r["score"] for r in semantic_results)
+            for r in semantic_results:
+                r["normalized_score"] = r["score"] / max_semantic if max_semantic > 0 else 0
+
+        """
+        
         3. Normalize BM25 scores the same way
+
+
+        """
+        
+        if bm25_results:
+            max_bm25 = max(r["score"] for r in bm25_results)
+            for r in bm25_results:
+                r["normalized_score"] = r["score"] / max_bm25 if max_bm25 > 0 else 0
+
+        """
         
         4. Combine results into a single dict keyed by chunk_id:
            combined = {}
@@ -472,9 +513,45 @@ class RetrievalPipeline:
            
            Combined score formula:
            combined_score = (semantic_weight * semantic_score) + (bm25_weight * bm25_score)
+
+        """
+
+        for r in semantic_results:
+            cid = r["chunk_id"]
+            combined[cid] = {
+            "chunk_id": cid,
+            "payload": r["payload"],
+            "semantic_score": r["normalized_score"],
+            "bm25_score": 0.0,
+            "combined_score": r["normalized_score"] * self.config.semantic_weight
+        }
+        for r in bm25_results:
+            cid = r["chunk_id"]
+            if cid in combined:
+                # Already found in semantic search? Add the extra points!
+                combined[cid]["bm25_score"] = r["normalized_score"]
+                combined[cid]["combined_score"] += r["normalized_score"] * self.config.bm25_weight
+            else:
+                # New result found only by keywords
+                combined[cid] = {
+            "chunk_id": cid,
+            "payload": r["payload"],
+            "semantic_score": 0.0,
+            "bm25_score": r["normalized_score"],
+            "combined_score": r["normalized_score"] * self.config.bm25_weight
+        }
+
+        """
         
         5. Sort by combined_score descending:
            results = sorted(combined.values(), key=lambda x: x["combined_score"], reverse=True)
+
+        """
+
+        results = sorted(combined.values(), key=lambda x: x["combined_score"], reverse=True)
+
+        """
+
         
         6. Return the sorted list
         
@@ -486,7 +563,10 @@ class RetrievalPipeline:
         Returns:
             Combined and sorted list of results
         """
-        pass
+        return results
+
+
+
     
     def rerank(self, query: str, results: list[dict], top_k: int = 10) -> list[dict]:
         """
