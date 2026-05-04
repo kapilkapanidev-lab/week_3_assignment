@@ -615,14 +615,34 @@ class RetrievalPipeline:
         1. Run hybrid search to get candidates:
            candidates = self.hybrid_search(query)
         
+
+        """
+        candidates = self.hybrid.search(query)
+        """
+
+
+
         2. Rerank if enabled:
            if self.config.use_reranker:
                reranked = self.rerank(query, candidates, top_k=min(top_k * 2, len(candidates)))
            else:
                reranked = candidates
+
+
+        """
+        if self.config.use_reranker:
+            reranked = self.rerank(query, candidates, top_k=min(top_k * 2, len(candidates)))
+        else:
+            reranked = candidates
+
+        """
         
         3. Take top_k results:
            final = reranked[:top_k]
+
+        """
+        final = reranked[:top_k]
+        """    
         
         4. Convert to RetrievalResult objects:
            return [
@@ -647,11 +667,25 @@ class RetrievalPipeline:
         Args:
             query: User's search query
             top_k: Number of results to return
+
+
             
         Returns:
             List of RetrievalResult objects ready for RAG generation
         """
-        pass
+        return [
+            RetrievalResult(
+                chunk_id=r["chunk_id"],
+                paper_id=r["payload"]["paper_id"],
+                title=r["payload"]["title"],
+                authors=r["payload"]["authors"],
+                text=r["payload"]["text"],
+                score=r.get("combined_score", r.get("score", 0.0)),
+                acm_url=r["payload"].get("acm_url"),
+                abstract_url=r["payload"].get("abstract_url")
+            )
+            for r in final
+        ]
 
 
 # For testing this file directly
@@ -673,6 +707,9 @@ if __name__ == "__main__":
         print(f"   Paper ID: {r.paper_id}")
         print(f"   Text preview: {r.text[:100]}...")
         print()
+
+
+
 
 
 
