@@ -370,6 +370,11 @@ class RetrievalPipeline:
         TODO:
         1. Embed the query:
            query_embedding = self.embedder.embed_query(query)
+
+        """
+        query_embedding_vector = self.embedder.embed_query(query)
+
+        """
         
         2. Search Qdrant:
            results = self.qdrant.query_points(
@@ -378,6 +383,13 @@ class RetrievalPipeline:
                limit=top_k,
                with_payload=True
            ).points
+
+        """
+        results = self.qdrant.query_points(collection_name="siggraph2025_papers", query=query_embedding_vector.tolist(), limit=top_k, with_payload=True).points
+
+        """
+
+       
         
         3. Convert to list of dicts:
            return [
@@ -392,11 +404,17 @@ class RetrievalPipeline:
         Args:
             query: Search query
             top_k: Number of results to return
-            
-        Returns:
-            List of result dicts with chunk_id, score, and payload
+
+
         """
-        pass
+        return [
+            {
+                "chunk_id": r.payload["chunk_id"],
+                "score": r.score,
+                "payload": r.payload
+            }
+            for r in results
+        ]
     
     def bm25_search(self, query: str, top_k: int = 30) -> list[dict]:
         """
