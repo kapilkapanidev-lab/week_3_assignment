@@ -127,42 +127,40 @@ class RAGGenerator:
         """
         self.openrouter_base_url = "https://openrouter.ai/api/v1"
 
+    
     def refine_query(self, query: str) -> str:
-        """
-        Use LLM to improve the search query (optional but helps retrieval).
-        
-        TODO:
-        1. If self.config.refine_query is False, return query unchanged
-        
-        2. Build the prompt using QUERY_REFINEMENT_PROMPT.format(query=query)
-        
-        3. Build headers:
-           {"Authorization": f"Bearer {self.openrouter_api_key}", "Content-Type": "application/json"}
-        
-        4. Build payload:
-           {
-               "model": self.config.refinement_model,
-               "messages": [{"role": "user", "content": prompt}],
-               "temperature": 0.3,
-               "max_tokens": 100
-           }
-        
-        5. Make POST request to f"{self.openrouter_base_url}/chat/completions"
-        
-        6. If request fails, return original query (don't crash)
-        
-        7. Parse response and extract the refined query from the response
-           refined = response_json["choices"][0]["message"]["content"].strip()
-        
-        8. Return refined query (strip any quotes)
-        
-        Args:
-            query: Original user query
+      """
+      Use LLM to improve the search query (optional but helps retrieval).
+      """
+      # 1. Check if refinement is enabled in the config
+      if not self.config.refine_query:
+        return query
             
-        Returns:
-            Refined query (or original if refinement disabled/fails)
-        """
-        pass
+      try:
+        # 2. Build the prompt using the template at the top of the file
+        prompt = QUERY_REFINEMENT_PROMPT.format(query=query)
+            
+        # 3. Setup the API request to OpenRouter
+        headers = {"Authorization": f"Bearer {self.openrouter_api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": self.config.refinement_model, # gpt-3.5-turbo (cheaper/faster)
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 100
+        }
+            
+        # 4. Make the call
+        response = requests.post(f"{self.openrouter_base_url}/chat/completions", headers=headers, json=payload)
+        response.raise_for_status()
+            
+        # 5. Extract and clean the refined query
+        refined = response.json()["choices"][0]["message"]["content"].strip()
+        return refined.strip("\"'") # Remove any quotes the AI might have added
+            
+      except Exception as e:
+        # 6. Safety: If the AI refiner fails, just use the original query
+        print(f"Query refinement failed: {e}")
+        return query
     
     def _format_context(self, results: list[RetrievalResult]) -> str:
         """
