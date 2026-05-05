@@ -54,4 +54,7 @@ backend/__pycache__/
 backend/*.pyc
 
 
+# Data and large files
+backend/chunks.json
 *.npz
+backend/embeddings_BAAI_bge_large_en_v1.5.npz
