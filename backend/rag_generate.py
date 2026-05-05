@@ -61,7 +61,7 @@ Refined search query:"""
 @dataclass
 class GenerationConfig:
     """Configuration for the RAG generator."""
-    llm_model: str = "openai/gpt-4o"  # Model to use for answer generation
+    llm_model: str = "meta-llama/llama-3.1-8b-instruct"  # Changed for testing reliability
     temperature: float = 0.1  # Low temperature for factual answers
     max_tokens: int = 2000  # Max length of generated answer
     openrouter_api_key: Optional[str] = None  # Will load from env if not set
