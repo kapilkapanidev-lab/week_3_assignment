@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+import httpx
 import json
 
 try:
@@ -242,9 +243,6 @@ IMPORTANT: You have been provided with {len(results)} paper excerpts. Make sure 
 3. For "which paper" or "what papers" questions, list ALL relevant papers
 4. Do NOT include a References section - only use inline citations"""
 
-        # Stream from OpenRouter
-        import requests
-        
         headers = {
             "Authorization": f"Bearer {rag_generator.openrouter_api_key}",
             "Content-Type": "application/json"
@@ -261,29 +259,28 @@ IMPORTANT: You have been provided with {len(results)} paper excerpts. Make sure 
             "stream": True
         }
         
-        response = requests.post(
-            f"{rag_generator.openrouter_base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            stream=True
-        )
-        
+        # FIX: Use httpx async streaming instead of requests (which blocks the event loop)
         answer_chunks = []
-        for line in response.iter_lines():
-            if line:
-                line = line.decode('utf-8')
-                if line.startswith('data: '):
-                    data = line[6:]  # Remove 'data: ' prefix
-                    if data == '[DONE]':
-                        break
-                    try:
-                        chunk = json.loads(data)
-                        if chunk["choices"][0]["delta"].get("content"):
-                            content = chunk["choices"][0]["delta"]["content"]
-                            answer_chunks.append(content)
-                            yield emit("chunk", {"content": content})
-                    except json.JSONDecodeError:
-                        continue
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
+                "POST",
+                f"{rag_generator.openrouter_base_url}/chat/completions",
+                headers=headers,
+                json=payload
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.startswith('data: '):
+                        data = line[6:]
+                        if data == '[DONE]':
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            if chunk["choices"][0]["delta"].get("content"):
+                                content = chunk["choices"][0]["delta"]["content"]
+                                answer_chunks.append(content)
+                                yield emit("chunk", {"content": content})
+                        except json.JSONDecodeError:
+                            continue
         
         answer = "".join(answer_chunks)
         
@@ -387,15 +384,9 @@ async def websocket_query(websocket: WebSocket):
             "message": f"Searching {total_chunks:,} document chunks (semantic + keyword search)..."
         })
         
-        # Use the full retrieve method which handles everything properly
         results = await loop.run_in_executor(
             None,
-            lambda: rag_generator.retrieval.retrieve(
-                refined, 
-                top_k=top_k,
-                use_hybrid=True,
-                use_reranker=use_reranker
-            )
+            lambda: rag_generator.retrieval.retrieve(refined, top_k=top_k)
         )
         
         if not results:
@@ -437,9 +428,6 @@ IMPORTANT: You have been provided with {len(results)} paper excerpts. Make sure 
 3. For "which paper" or "what papers" questions, list ALL relevant papers
 4. Do NOT include a References section - only use inline citations"""
 
-        # Stream from OpenRouter
-        import requests
-        
         headers = {
             "Authorization": f"Bearer {rag_generator.openrouter_api_key}",
             "Content-Type": "application/json"
@@ -456,32 +444,31 @@ IMPORTANT: You have been provided with {len(results)} paper excerpts. Make sure 
             "stream": True
         }
         
-        response = requests.post(
-            f"{rag_generator.openrouter_base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            stream=True
-        )
-        
+        # FIX: Use httpx async streaming instead of requests (which blocks the event loop)
         answer_chunks = []
-        for line in response.iter_lines():
-            if line:
-                line_str = line.decode('utf-8')
-                if line_str.startswith('data: '):
-                    data_str = line_str[6:]
-                    if data_str == '[DONE]':
-                        break
-                    try:
-                        chunk = json.loads(data_str)
-                        if chunk["choices"][0]["delta"].get("content"):
-                            content = chunk["choices"][0]["delta"]["content"]
-                            answer_chunks.append(content)
-                            await websocket.send_json({
-                                "type": "chunk",
-                                "content": content
-                            })
-                    except json.JSONDecodeError:
-                        continue
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
+                "POST",
+                f"{rag_generator.openrouter_base_url}/chat/completions",
+                headers=headers,
+                json=payload
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str == '[DONE]':
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            if chunk["choices"][0]["delta"].get("content"):
+                                content = chunk["choices"][0]["delta"]["content"]
+                                answer_chunks.append(content)
+                                await websocket.send_json({
+                                    "type": "chunk",
+                                    "content": content
+                                })
+                        except json.JSONDecodeError:
+                            continue
         
         answer = "".join(answer_chunks)
         
