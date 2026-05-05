@@ -2,18 +2,6 @@
 
 import { useState, useCallback } from "react";
 
-interface SSEMessage {
-  type: "progress" | "chunk" | "complete" | "error";
-  message?: string;
-  content?: string;
-  answer?: string;
-  processing_time?: number;
-  sources?: Source[];
-  stage?: string;
-  step?: number;
-  total?: number;
-}
-
 interface Source {
   title: string;
   authors?: string;
@@ -65,131 +53,57 @@ export function useRAGStream(): UseRAGStreamReturn {
       setAnswer("");
       setSources([]);
       setProcessingTime(null);
-      setStatusMessage("Initializing...");
+      setStatusMessage("Searching 11,008 paper chunks...");
       setCurrentStep(0);
-      setTotalSteps(6); // Will be updated from backend
-      setCurrentStage("initializing");
-
-      const params = new URLSearchParams({
-        query: query,
-        top_k: topK.toString(),
-        refine_query: refineQuery.toString(),
-        use_reranker: useReranker.toString(),
-      });
+      setTotalSteps(4);
+      setCurrentStage("searching");
 
       try {
-        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082").replace(/\/$/, "");
-        const response = await fetch(`${apiUrl}/api/stream?${params}`);
+        const apiUrl = (
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082"
+        ).replace(/\/$/, "");
+
+        // Use /api/query (POST) instead of /api/stream (SSE)
+        const response = await fetch(`${apiUrl}/api/query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: query,
+            top_k: topK,
+            refine_query: refineQuery,
+            use_reranker: useReranker,
+          }),
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error("No reader available");
-        }
+        const data = await response.json();
 
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            console.log("📡 Stream complete");
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process complete SSE messages
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data: SSEMessage = JSON.parse(line.slice(6));
-                handleSSEMessage(data);
-              } catch (e) {
-                console.error("Failed to parse SSE data:", e);
-              }
-            }
-          }
-        }
-
+        // Update all state from the response
+        setAnswer(data.answer || "");
+        setSources(data.sources || []);
+        setProcessingTime(data.processing_time ?? null);
+        setCurrentStage("complete");
+        setStatusMessage(
+          `Done in ${data.processing_time?.toFixed(1) || "?"}s`
+        );
+        setCurrentStep(4);
+        setIsActive(false);
         setIsLoading(false);
       } catch (error) {
-        console.error("Stream error:", error);
+        console.error("Query error:", error);
         setStatusMessage(
           `Error: ${error instanceof Error ? error.message : "Unknown error"}`
         );
+        setCurrentStage("error");
         setIsActive(false);
         setIsLoading(false);
       }
     },
     []
   );
-
-  const handleSSEMessage = (data: SSEMessage) => {
-    console.log("📨 SSE:", data.type, data.message || "", data.stage || "");
-
-    switch (data.type) {
-      case "progress":
-        setStatusMessage(data.message || "");
-        if (data.step !== undefined) {
-          setCurrentStep(data.step);
-        }
-        if (data.total !== undefined) {
-          setTotalSteps(data.total);
-        }
-        if (data.stage) {
-          setCurrentStage(data.stage);
-        }
-        setIsActive(true);
-        break;
-
-      case "chunk":
-        setAnswer((prev) => {
-          const newAnswer = prev + (data.content || "");
-          return newAnswer;
-        });
-        setStatusMessage("Writing answer...");
-        setCurrentStage("writing");
-        setIsActive(true);
-        break;
-
-      case "complete":
-        if (data.answer) {
-          setAnswer(data.answer);
-        }
-        if (data.processing_time !== undefined) {
-          setProcessingTime(data.processing_time);
-        }
-        if (data.sources) {
-          setSources(data.sources);
-        }
-        if (data.step !== undefined) {
-          setCurrentStep(data.step);
-        }
-        if (data.total !== undefined) {
-          setTotalSteps(data.total);
-        }
-        setCurrentStage("complete");
-        setStatusMessage(`Done in ${data.processing_time?.toFixed(1) || "?"}s`);
-        setIsActive(false);
-        setIsLoading(false);
-        break;
-
-      case "error":
-        setStatusMessage(`Error: ${data.message || "Unknown error"}`);
-        setCurrentStage("error");
-        setIsActive(false);
-        setIsLoading(false);
-        break;
-    }
-  };
 
   const reset = useCallback(() => {
     setAnswer("");
