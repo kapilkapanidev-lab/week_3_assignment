@@ -320,7 +320,8 @@ async def stream_query(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Transfer-Encoding": "chunked",
         }
     )
 
